@@ -22,42 +22,43 @@ exa_client = Exa(api_key=settings.exa_api_key)
 
 # Initialize agent
 
-system_prompt = """
+tools = botmailroom_client.get_tools(
+    tools_to_include=["botmailroom_send_email"]
+) + [
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Perform a search query on the web, and retrieve the most relevant URLs/web data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to perform.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    }
+]
+valid_tool_names = ",".join([tool["function"]["name"] for tool in tools])
+
+system_prompt = f"""
 Act as an executive assistant and respond on my behalf when appropriate. Follow these rules:
 - Prioritize professionalism, clarity, and concise responses.
 - The user is only able to respond to emails.
 - Email content should be formatted as email compliant html.
+- The sign-off name should be the name the user addresses you by in the email salutation or "Bot" if they don't address you by name.
 - Research Questions: If asked for research or factual data, use your internal knowledge and web searches (you can do multiple searches) to provide a comprehensive answer.
 - Uncertainty: If the query is unclear or there's low confidence that you can add value, let the user know.
 - Always respond with one of the following:
-    - A tool call
+    - A tool call - the only valid tool names are {valid_tool_names}
     - `PLAN` followed by a description of the steps to complete the task
     - `WAIT` to wait for a response to an email
     - `DONE` to indicate that the task is complete
 """
-tools = botmailroom_client.get_tools(
-    tools_to_include=["botmailroom_send_email"]
-)
-if exa_client:
-    tools.append(
-        {
-            "type": "function",
-            "function": {
-                "name": "web_search",
-                "description": "Perform a search query on the web, and retrieve the most relevant URLs/web data.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The search query to perform.",
-                        },
-                    },
-                    "required": ["query"],
-                },
-            },
-        }
-    )
 
 # Initialize FastAPI app
 
@@ -130,7 +131,7 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                         "content": "Please respond with either a tool call, PLAN, WAIT, or DONE",
                     }
                 )
-            elif content.startswith("PLAN"):
+            elif content.strip("`").startswith("PLAN"):
                 logger.info(f"Plan: {content[4:]}")
                 chat_thread.append(
                     {
@@ -138,10 +139,10 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                         "content": "Looks like a good plan, let's do it!",
                     }
                 )
-            elif content.startswith("WAIT"):
+            elif content.strip("`").startswith("WAIT"):
                 logger.info("Waiting for user response")
                 return
-            elif content.startswith("DONE"):
+            elif content.strip("`").startswith("DONE"):
                 logger.info("Task complete")
                 return
             else:
