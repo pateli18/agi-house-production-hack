@@ -86,6 +86,7 @@ def exa_search(query: str) -> str:
 
 async def handle_model_call(chat_id: str, chat_thread: list[dict]):
     cycle_count = 0
+    end = False
     while cycle_count <= settings.max_response_cycles:
         cycle_count += 1
         try:
@@ -118,17 +119,20 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                     arguments,
                     enforce_str_output=True,
                 )
-                return
+                end = True
             elif tool_call.function.name.startswith("web_search"):
                 tool_output = exa_search(arguments["query"])
             else:
                 raise ValueError(f"Unknown tool: {tool_call.function.name}")
             chat_thread.append(
                 {
-                    "role": "user",
+                    "role": "tool",
                     "content": tool_output,
+                    "name": tool_call.function.name,
+                    "tool_call_id": tool_call.id,
                 }
             )
+            logger.info(f"Tool output: {tool_output}")
         else:
             content = output.choices[0].message.content
             logger.warning(f"Invalid response from model: {content}")
@@ -139,8 +143,11 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                 }
             )
 
-        async with async_session_scope() as session:
-            await store_chat(chat_id, chat_thread, session)
+        if end:
+            break
+
+    async with async_session_scope() as session:
+        await store_chat(chat_id, chat_thread, session)
 
 
 async def handle_email(email_payload: EmailPayload):
