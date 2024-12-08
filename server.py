@@ -90,6 +90,7 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
     while cycle_count <= settings.max_response_cycles:
         cycle_count += 1
         try:
+            logger.info(chat_thread)
             output = await openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=chat_thread,  # type: ignore
