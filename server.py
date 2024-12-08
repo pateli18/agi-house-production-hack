@@ -57,7 +57,7 @@ Act as an executive assistant and respond on my behalf when appropriate. Follow 
 - Always respond with one of the following:
     - A tool call - the only valid tool names are {valid_tool_names}
     - `PLAN` followed by a description of the steps to complete the task
-    - `WAIT` to wait for a response to an email
+    - `WAIT` to wait for a response to an email. This can only be used if you sent an email to the user in the previous step.
     - `DONE` to indicate that the task is complete
 """
 
