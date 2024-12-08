@@ -210,5 +210,5 @@ async def receive_email(
 ):
     logger.info(email_payload)
     # move to background task to respond to webhook
-    # background_tasks.add_task(handle_email, email_payload)
+    background_tasks.add_task(handle_email, email_payload)
     return Response(status_code=204)
