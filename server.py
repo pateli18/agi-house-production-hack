@@ -125,12 +125,10 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                 raise ValueError(f"Unknown tool: {tool_call.function.name}")
             chat_thread.append(
                 {
-                    "role": "tool",
+                    "role": "user",
                     "content": tool_output,
-                    "tool_call_id": tool_call.id,
                 }
             )
-            logger.info(f"Tool output: {tool_output}")
         else:
             content = output.choices[0].message.content
             logger.warning(f"Invalid response from model: {content}")
