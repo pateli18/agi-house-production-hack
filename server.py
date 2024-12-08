@@ -85,19 +85,21 @@ def exa_search(query: str) -> str:
 
 
 async def handle_model_call(chat_id: str, chat_thread: list[dict]):
-    cycle_count = 1
+    cycle_count = 0
     while cycle_count <= settings.max_response_cycles:
+        cycle_count += 1
         try:
             output = await openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=chat_thread,  # type: ignore
                 tools=tools,  # type: ignore
             )
-        except Exception as e:
+        except Exception:
+            logger.exception("Error calling model")
             chat_thread.append(
                 {
                     "role": "user",
-                    "content": f"Error calling model: {e}",
+                    "content": "Error calling model, are you using the right tools?",
                 }
             )
             continue
@@ -141,7 +143,6 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
 
         async with async_session_scope() as session:
             await store_chat(chat_id, chat_thread, session)
-        cycle_count += 1
 
 
 async def handle_email(email_payload: EmailPayload):
