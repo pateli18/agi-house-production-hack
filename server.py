@@ -57,8 +57,6 @@ Act as an executive assistant and respond on my behalf when appropriate. Follow 
 - Always respond with one of the following:
     - A tool call - the only valid tool names are {valid_tool_names}
     - `PLAN` followed by a description of the steps to complete the task
-    - `WAIT` to wait for a response to an email. This can only be used if you sent an email to the user in the previous step.
-    - `DONE` to indicate that the task is complete
 """
 
 # Initialize FastAPI app
@@ -118,6 +116,7 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
                     arguments,
                     enforce_str_output=True,
                 )
+                return
             elif tool_call.function.name.startswith("web_search"):
                 tool_output = exa_search(arguments["query"])
             else:
@@ -132,40 +131,16 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
             logger.info(f"Tool output: {tool_output}")
         else:
             content = output.choices[0].message.content
-            chat_thread.append({"role": "assistant", "content": content or ""})
-            if content is None:
-                logger.warning(f"Invalid response from model: {content}")
-                chat_thread.append(
-                    {
-                        "role": "user",
-                        "content": "Please respond with either a tool call, PLAN, WAIT, or DONE",
-                    }
-                )
-            elif content.strip("`").startswith("PLAN"):
-                logger.info(f"Plan: {content[4:]}")
-                chat_thread.append(
-                    {
-                        "role": "user",
-                        "content": "Looks like a good plan, let's do it!",
-                    }
-                )
-            elif content.strip("`").startswith("WAIT"):
-                logger.info("Waiting for user response")
-                return
-            elif content.strip("`").startswith("DONE"):
-                logger.info("Task complete")
-                return
-            else:
-                logger.warning(f"Invalid response from model: {content}")
-                chat_thread.append(
-                    {
-                        "role": "user",
-                        "content": "Please respond with either a tool call, PLAN, WAIT, or DONE",
-                    }
-                )
+            logger.warning(f"Invalid response from model: {content}")
+            chat_thread.append(
+                {
+                    "role": "user",
+                    "content": "Please respond with either a tool call or PLAN",
+                }
+            )
 
-            async with async_session_scope() as session:
-                await store_chat(chat_id, chat_thread, session)
+        async with async_session_scope() as session:
+            await store_chat(chat_id, chat_thread, session)
         cycle_count += 1
 
 
