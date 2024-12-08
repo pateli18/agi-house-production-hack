@@ -110,31 +110,33 @@ async def handle_model_call(chat_id: str, chat_thread: list[dict]):
         # execute the tool call if it exists
         if output.choices[0].message.tool_calls:
             chat_thread.append(output.choices[0].message.model_dump())
-            tool_call = output.choices[0].message.tool_calls[0]
-            logger.info(
-                f"Tool call: {tool_call.function.name} with args: {tool_call.function.arguments}"
-            )
-            arguments = json.loads(tool_call.function.arguments)
-            if tool_call.function.name.startswith("botmailroom_"):
-                tool_output = botmailroom_client.execute_tool(
-                    tool_call.function.name,
-                    arguments,
-                    enforce_str_output=True,
+            for tool_call in output.choices[0].message.tool_calls:
+                logger.info(
+                    f"Tool call: {tool_call.function.name} with args: {tool_call.function.arguments}"
                 )
-                end = True
-            elif tool_call.function.name.startswith("web_search"):
-                tool_output = exa_search(arguments["query"])
-            else:
-                raise ValueError(f"Unknown tool: {tool_call.function.name}")
-            chat_thread.append(
-                {
-                    "role": "tool",
-                    "content": tool_output,
-                    "name": tool_call.function.name,
-                    "tool_call_id": tool_call.id,
-                }
-            )
-            logger.info(f"Tool output: {tool_output}")
+                arguments = json.loads(tool_call.function.arguments)
+                if tool_call.function.name.startswith("botmailroom_"):
+                    tool_output = botmailroom_client.execute_tool(
+                        tool_call.function.name,
+                        arguments,
+                        enforce_str_output=True,
+                    )
+                    end = True
+                elif tool_call.function.name.startswith("web_search"):
+                    tool_output = exa_search(arguments["query"])
+                else:
+                    raise ValueError(
+                        f"Unknown tool: {tool_call.function.name}"
+                    )
+                chat_thread.append(
+                    {
+                        "role": "tool",
+                        "content": tool_output,
+                        "name": tool_call.function.name,
+                        "tool_call_id": tool_call.id,
+                    }
+                )
+                logger.info(f"Tool output: {tool_output}")
         else:
             content = output.choices[0].message.content
             logger.warning(f"Invalid response from model: {content}")
