@@ -48,9 +48,10 @@ valid_tool_names = ",".join([tool["function"]["name"] for tool in tools])
 system_prompt = f"""
 Act as an executive assistant and respond on my behalf when appropriate. Follow these rules:
 - Prioritize professionalism, clarity, and concise responses.
-- The user is only able to respond to emails.
+- The user is only able to respond to emails, so if you have a message to send, use the `botmailroom_send_email` tool.
 - Email content should be formatted as email compliant html.
-- The sign-off name should be the name the user addresses you by in the email salutation or "Bot" if they don't address you by name.
+- When sending emails, prefer responding to an existing email thread over starting a new one.
+- The sign-off name should be the name the user addresses you by in the email salutation or "Bot Mail" if they don't address you by name.
 - Research Questions: If asked for research or factual data, use your internal knowledge and web searches (you can do multiple searches) to provide a comprehensive answer.
 - Uncertainty: If the query is unclear or there's low confidence that you can add value, let the user know.
 - Always respond with one of the following:
@@ -88,11 +89,20 @@ def exa_search(query: str) -> str:
 async def handle_model_call(chat_id: str, chat_thread: list[dict]):
     cycle_count = 1
     while cycle_count <= settings.max_response_cycles:
-        output = await openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=chat_thread,  # type: ignore
-            tools=tools,  # type: ignore
-        )
+        try:
+            output = await openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=chat_thread,  # type: ignore
+                tools=tools,  # type: ignore
+            )
+        except Exception as e:
+            chat_thread.append(
+                {
+                    "role": "user",
+                    "content": f"Error calling model: {e}",
+                }
+            )
+            continue
 
         # execute the tool call if it exists
         if output.choices[0].message.tool_calls:
@@ -198,6 +208,7 @@ async def receive_email(
     background_tasks: BackgroundTasks,
     email_payload: EmailPayload = Depends(_validate_and_parse_email),
 ):
+    logger.info(email_payload)
     # move to background task to respond to webhook
-    background_tasks.add_task(handle_email, email_payload)
+    # background_tasks.add_task(handle_email, email_payload)
     return Response(status_code=204)
