@@ -1,0 +1,8 @@
+aiosqlite
+botmailroom
+exa_py
+fastapi
+openai
+pydantic-settings
+sqlalchemy[asyncio]
+uvicorn
